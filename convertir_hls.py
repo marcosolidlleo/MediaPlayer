@@ -1,3 +1,5 @@
+import static_ffmpeg
+static_ffmpeg.add_paths()  # Descarga/configura FFmpeg automáticamente
 import os
 import shutil
 import subprocess
