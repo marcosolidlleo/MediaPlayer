@@ -37,10 +37,11 @@ def procesar_y_subir_s3(ruta_mp4_temporal: str, id_video: str):
         output_playlist = os.path.join(carpeta_hls, "index.m3u8")
         output_segment_pattern = os.path.join(carpeta_hls, "segmento_%03d.ts")
 
-        # 1. Transcodificación HLS con FFmpeg
+        # 1. Transcodificación HLS ligera para no agotar la RAM de Render
         comando = [
             "ffmpeg", "-y", "-i", ruta_mp4_temporal,
-            "-c:v", "libx264", "-c:a", "aac",
+            "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1",
+            "-c:a", "aac",
             "-hls_time", "4",
             "-hls_list_size", "0",
             "-hls_segment_filename", output_segment_pattern,
