@@ -1,7 +1,7 @@
 import os
 import shutil
 import subprocess
-from fastapi import FastAPI, UploadFile, File, BackgroundTask
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 import boto3
 
