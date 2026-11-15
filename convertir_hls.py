@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import re
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import boto3
 import static_ffmpeg
@@ -11,6 +11,10 @@ import static_ffmpeg
 static_ffmpeg.add_paths()
 
 app = FastAPI(title="Servicio Streaming HLS - PaaS & AWS S3")
+
+@app.get("/")
+async def servir_frontend():
+    return FileResponse("index.html")
 
 # 1. Permitir peticiones desde tu página HTML (CORS)
 app.add_middleware(

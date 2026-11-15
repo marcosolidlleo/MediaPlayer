@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plataforma Streaming HLS - Cloud Project</title>
+    <title>Plataforma Streaming de Video</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; max-width: 900px; margin: 0 auto; padding: 2rem; }
@@ -21,7 +21,7 @@
 </head>
 <body>
 
-    <h1>🎬 Mi Plataforma de Streaming HLS</h1>
+    <h1>MyTube</h1>
 
     <!-- REPRODUCTOR -->
     <div class="card">
@@ -31,7 +31,7 @@
 
     <!-- SUBIDA DE VÍDEOS -->
     <div class="card">
-        <h2 style="margin-top:0;">Subir nuevo vídeo (.mp4)</h2>
+        <h2 style="margin-top:0;">Subir nuevo vídeo</h2>
         <input type="file" id="archivo-video" accept="video/mp4">
         <button id="btn-subir" onclick="subirVideo()">Subir y Procesar en la Nube</button>
         <div id="estado"></div>
@@ -40,10 +40,10 @@
     <!-- GALERÍA DE VÍDEOS EN AWS S3 -->
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2 style="margin:0;">Vídeos disponibles en AWS S3</h2>
+            <h2 style="margin:0;">Vídeos disponibles</h2>
             <button onclick="cargarGaleria()">🔄 Actualizar lista</button>
         </div>
-        <div id="galeria" class="video-list">Cargando vídeos desde S3...</div>
+        <div id="galeria" class="video-list">Cargando vídeos</div>
     </div>
 
     <script>
