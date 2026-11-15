@@ -4,13 +4,22 @@ import subprocess
 import re
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import boto3
 import static_ffmpeg
 
-# Asegurar los ejecutable de FFmpeg
 static_ffmpeg.add_paths()
 
 app = FastAPI(title="Servicio Streaming HLS - PaaS & AWS S3")
+
+# 1. Permitir peticiones desde tu página HTML (CORS)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
@@ -37,7 +46,6 @@ def procesar_y_subir_s3(ruta_mp4_temporal: str, id_video: str):
         output_playlist = os.path.join(carpeta_hls, "index.m3u8")
         output_segment_pattern = os.path.join(carpeta_hls, "segmento_%03d.ts")
 
-        # 1. Transcodificación HLS ligera para no agotar la RAM de Render
         comando = [
             "ffmpeg", "-y", "-i", ruta_mp4_temporal,
             "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1",
@@ -55,7 +63,6 @@ def procesar_y_subir_s3(ruta_mp4_temporal: str, id_video: str):
 
         print(f"--> FFmpeg completado. Subiendo archivos a S3 ({BUCKET_NAME})...")
 
-        # 2. Subida de archivos a AWS S3
         archivos = os.listdir(carpeta_hls)
         for archivo in archivos:
             ruta_local = os.path.join(carpeta_hls, archivo)
@@ -83,17 +90,14 @@ def procesar_y_subir_s3(ruta_mp4_temporal: str, id_video: str):
 
 @app.post("/subir-video/")
 async def subir_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    # Sanear el nombre del archivo eliminando espacios y caracteres especiales
     nombre_limpio = os.path.splitext(file.filename)[0]
     id_video = re.sub(r'[^a-zA-Z0-9_]', '_', nombre_limpio)
-    
     ruta_temporal = f"temp_{id_video}.mp4"
 
     with open(ruta_temporal, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
     background_tasks.add_task(procesar_y_subir_s3, ruta_temporal, id_video)
-    
     url_stream_final = f"{PUBLIC_DOMAIN}/videos/{id_video}/index.m3u8"
 
     return JSONResponse(
@@ -103,3 +107,25 @@ async def subir_video(background_tasks: BackgroundTasks, file: UploadFile = File
             "url_playlist_hls": url_stream_final
         }
     )
+
+
+# 2. Nuevo endpoint para listar todos los vídeos guardados en S3
+@app.get("/videos/")
+async def listar_videos():
+    try:
+        respuesta = s3_client.list_objects_v2(
+            Bucket=BUCKET_NAME,
+            Prefix="videos/",
+            Delimiter="/"
+        )
+        videos = []
+        for prefijo in respuesta.get("CommonPrefixes", []):
+            # Extraer el nombre de la carpeta (ej: "videos/Fortnite_123/" -> "Fortnite_123")
+            carpeta = prefijo.get("Prefix").rstrip("/").split("/")[-1]
+            videos.append({
+                "id": carpeta,
+                "url": f"{PUBLIC_DOMAIN}/videos/{carpeta}/index.m3u8"
+            })
+        return JSONResponse(content={"videos": videos})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})

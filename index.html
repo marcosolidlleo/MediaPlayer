@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma Streaming HLS - Cloud Project</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; max-width: 900px; margin: 0 auto; padding: 2rem; }
+        h1 { color: #38bdf8; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; }
+        .card { background: #1e293b; padding: 1.5rem; border-radius: 10px; margin-bottom: 1.5rem; }
+        video { width: 100%; max-height: 480px; background: #000; border-radius: 8px; }
+        button { background: #0284c7; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0369a1; }
+        button:disabled { background: #475569; cursor: not-allowed; }
+        .video-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .video-item { background: #334155; padding: 1rem; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; gap: 0.8rem; }
+        .video-title { font-weight: 600; word-break: break-all; font-size: 0.95rem; }
+        #estado { margin-top: 1rem; font-size: 0.95rem; color: #94a3b8; }
+    </style>
+</head>
+<body>
+
+    <h1>🎬 Mi Plataforma de Streaming HLS</h1>
+
+    <!-- REPRODUCTOR -->
+    <div class="card">
+        <h2 id="titulo-actual" style="margin-top:0;">Selecciona un vídeo para reproducir</h2>
+        <video id="reproductor" controls></video>
+    </div>
+
+    <!-- SUBIDA DE VÍDEOS -->
+    <div class="card">
+        <h2 style="margin-top:0;">Subir nuevo vídeo (.mp4)</h2>
+        <input type="file" id="archivo-video" accept="video/mp4">
+        <button id="btn-subir" onclick="subirVideo()">Subir y Procesar en la Nube</button>
+        <div id="estado"></div>
+    </div>
+
+    <!-- GALERÍA DE VÍDEOS EN AWS S3 -->
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0;">Vídeos disponibles en AWS S3</h2>
+            <button onclick="cargarGaleria()">🔄 Actualizar lista</button>
+        </div>
+        <div id="galeria" class="video-list">Cargando vídeos desde S3...</div>
+    </div>
+
+    <script>
+        const API_URL = "https://mediaplayer-fn8h.onrender.com";
+        const videoElement = document.getElementById('reproductor');
+        let hls = null;
+
+        // Función para cargar y reproducir un stream HLS (.m3u8)
+        function reproducirVideo(url, titulo) {
+            document.getElementById('titulo-actual').innerText = "Reproduciendo: " + titulo;
+            
+            if (Hls.isSupported()) {
+                if (hls) hls.destroy();
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(videoElement);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => videoElement.play());
+            } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+                videoElement.src = url;
+                videoElement.addEventListener('loadedmetadata', () => videoElement.play());
+            }
+        }
+
+        // Función para consultar el bucket S3 a través de FastAPI
+        async function cargarGaleria() {
+            const galeria = document.getElementById('galeria');
+            galeria.innerHTML = "Consultando AWS S3...";
+            try {
+                const res = await fetch(`${API_URL}/videos/`);
+                const data = await res.json();
+                
+                if (!data.videos || data.videos.length === 0) {
+                    galeria.innerHTML = "<p>Aún no hay vídeos procesados en S3.</p>";
+                    return;
+                }
+
+                galeria.innerHTML = "";
+                data.videos.forEach(vid => {
+                    const card = document.createElement('div');
+                    card.className = 'video-item';
+                    card.innerHTML = `
+                        <div class="video-title">🎞️ ${vid.id}</div>
+                        <button onclick="reproducirVideo('${vid.url}', '${vid.id}')">▶ Ver vídeo</button>
+                    `;
+                    galeria.appendChild(card);
+                });
+            } catch (err) {
+                galeria.innerHTML = "<p style='color:#f87171;'>Error al conectar con Render (puede estar despertando, pulsa Actualizar en 30s).</p>";
+            }
+        }
+
+        // Función para enviar un MP4 al backend
+        async function subirVideo() {
+            const input = document.getElementById('archivo-video');
+            const estado = document.getElementById('estado');
+            const btn = document.getElementById('btn-subir');
+
+            if (!input.files.length) {
+                alert("Por favor, selecciona un archivo .mp4 primero.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+
+            btn.disabled = true;
+            estado.innerText = "⏳ Subiendo archivo a Render (si el servidor estaba dormido puede tardar ~40s)...";
+
+            try {
+                const res = await fetch(`${API_URL}/subir-video/`, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                
+                estado.innerHTML = `✅ <strong>${data.mensaje}</strong><br>Espera unos 15-20 segundos a que FFmpeg termine de subirlo a S3 y pulsa <em>"Actualizar lista"</em>.`;
+                input.value = "";
+            } catch (err) {
+                estado.innerHTML = "<span style='color:#f87171;'>❌ Error al subir el vídeo. Revisa la conexión con Render.</span>";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Cargar la lista automáticamente al abrir la página
+        cargarGaleria();
+    </script>
+</body>
+</html>
