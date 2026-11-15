@@ -50,11 +50,14 @@ def procesar_y_subir_s3(ruta_mp4_temporal: str, id_video: str):
         output_playlist = os.path.join(carpeta_hls, "index.m3u8")
         output_segment_pattern = os.path.join(carpeta_hls, "segmento_%03d.ts")
 
+        # 1. Transcodificación HLS forzando cortes exactos cada 2 segundos
         comando = [
             "ffmpeg", "-y", "-i", ruta_mp4_temporal,
+            "-vf", "scale=-2:720",
             "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1",
+            "-g", "60", "-keyint_min", "60", "-sc_threshold", "0",
             "-c:a", "aac",
-            "-hls_time", "4",
+            "-hls_time", "2",
             "-hls_list_size", "0",
             "-hls_segment_filename", output_segment_pattern,
             "-f", "hls", output_playlist
